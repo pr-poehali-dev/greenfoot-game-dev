@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // ─── ТИПЫ ───────────────────────────────────────────────────────────────────
-type GameScreen = "menu" | "playing" | "win" | "lose" | "levelComplete" | "leaderboard" | "enterName";
+type GameScreen = "menu" | "playing" | "win" | "lose" | "levelComplete" | "leaderboard" | "enterName" | "achievements";
 type PuzzleType = "maze" | "pattern" | "sequence" | "logic";
 
 interface Cell {
@@ -35,6 +35,39 @@ interface ScoreEntry {
   name: string;
   score: number;
   date: string;
+}
+
+interface Achievement {
+  id: string;
+  title: string;
+  desc: string;
+  icon: string;
+  secret?: boolean;
+}
+
+const ACHIEVEMENTS: Achievement[] = [
+  { id: "first_win",     icon: "🏆", title: "ПЕРВАЯ ПОБЕДА",      desc: "Пройди все 10 уровней" },
+  { id: "no_mistakes",   icon: "🎯", title: "БЕЗ ОШИБОК",         desc: "Пройди игру не потеряв ни одной жизни" },
+  { id: "speed_demon",   icon: "⚡", title: "МОЛНИЯ",              desc: "Получи 500+ бонусных очков за скорость за одну игру" },
+  { id: "level5",        icon: "⭐", title: "НА ПОЛПУТИ",          desc: "Дойди до 5-го уровня" },
+  { id: "score10k",      icon: "💎", title: "10 000 ОЧКОВ",        desc: "Набери 10 000 очков в одной игре" },
+  { id: "comeback",      icon: "🔥", title: "КАМБЭК",              desc: "Пройди игру с 1 оставшейся жизнью" },
+  { id: "speedrun",      icon: "🚀", title: "СПИДРАН",             desc: "Пройди уровень за первые 5 секунд", secret: true },
+  { id: "perfectionist", icon: "👑", title: "ПЕРФЕКЦИОНИСТ",       desc: "Пройди все 10 уровней без единой ошибки и с бонусом скорости", secret: true },
+];
+
+const ACH_KEY = "pq_achievements_v1";
+function loadAchievements(): string[] {
+  try { return JSON.parse(localStorage.getItem(ACH_KEY) || "[]"); } catch { return []; }
+}
+function unlockAchievement(id: string): boolean {
+  try {
+    const list = loadAchievements();
+    if (list.includes(id)) return false;
+    list.push(id);
+    localStorage.setItem(ACH_KEY, JSON.stringify(list));
+    return true;
+  } catch { return false; }
 }
 
 // ─── УРОВНИ ─────────────────────────────────────────────────────────────────
@@ -669,8 +702,8 @@ const LeaderboardScreen = ({ onBack, currentScore }: { onBack:()=>void; currentS
 };
 
 // ─── ЭКРАН МЕНЮ ──────────────────────────────────────────────────────────────
-const MenuScreen = ({ onStart, onLeaderboard, highScore, muted, onToggleMute }: {
-  onStart:()=>void; onLeaderboard:()=>void; highScore:number; muted:boolean; onToggleMute:()=>void;
+const MenuScreen = ({ onStart, onLeaderboard, onAchievements, highScore, muted, onToggleMute }: {
+  onStart:()=>void; onLeaderboard:()=>void; onAchievements:()=>void; highScore:number; muted:boolean; onToggleMute:()=>void;
 }) => {
   const [blink, setBlink] = useState(true);
   useEffect(() => { const t = setInterval(()=>setBlink(b=>!b), 600); return ()=>clearInterval(t); }, []);
@@ -701,6 +734,11 @@ const MenuScreen = ({ onStart, onLeaderboard, highScore, muted, onToggleMute }: 
           background:"transparent", color:"#FFD700", border:"2px solid #FFD700",
           padding:"12px 24px", cursor:"pointer",
         }}>🏆 РЕКОРДЫ</button>
+        <button onClick={()=>{sfx.playClick();onAchievements();}} style={{
+          fontFamily:"'Press Start 2P',monospace", fontSize:"9px",
+          background:"transparent", color:"#aaa", border:"2px solid #333",
+          padding:"12px 24px", cursor:"pointer",
+        }}>🏅 ДОСТИЖЕНИЯ ({loadAchievements().length}/{ACHIEVEMENTS.length})</button>
         <button onClick={onToggleMute} style={{
           fontFamily:"'Press Start 2P',monospace", fontSize:"8px",
           background:"transparent", color:"#555", border:"2px solid #333",
@@ -708,6 +746,83 @@ const MenuScreen = ({ onStart, onLeaderboard, highScore, muted, onToggleMute }: 
         }}>{muted?"🔇 ЗВУК ВЫКЛ":"🔊 ЗВУК ВКЛ"}</button>
       </div>
       <div style={{ fontFamily:"'VT323',monospace", color:"#222", fontSize:"12px", marginTop:"28px" }}>© 2084 PIXEL QUEST CORP.</div>
+    </div>
+  );
+};
+
+// ─── ТОСТ ДОСТИЖЕНИЯ ─────────────────────────────────────────────────────────
+const AchievementToast = ({ achievement, onDone }: { achievement: Achievement; onDone: () => void }) => {
+  useEffect(() => {
+    sfx.playVictory();
+    const t = setTimeout(onDone, 3500);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div style={{
+      position: "fixed", bottom: "24px", right: "24px", zIndex: 999,
+      background: "#0a0a0a", border: "3px solid #FFD700",
+      padding: "14px 18px", maxWidth: "260px",
+      boxShadow: "0 0 20px #FFD70060",
+      animation: "slideInRight 0.4s ease-out",
+    }}>
+      <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "7px", color: "#FFD700", marginBottom: "6px", letterSpacing: "1px" }}>
+        🏅 ДОСТИЖЕНИЕ ОТКРЫТО!
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <span style={{ fontSize: "28px" }}>{achievement.icon}</span>
+        <div>
+          <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "8px", color: "#FFD700" }}>{achievement.title}</div>
+          <div style={{ fontFamily: "'VT323',monospace", fontSize: "14px", color: "#888", marginTop: "3px" }}>{achievement.desc}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── ЭКРАН ДОСТИЖЕНИЙ ─────────────────────────────────────────────────────────
+const AchievementsScreen = ({ onBack }: { onBack: () => void }) => {
+  const unlocked = loadAchievements();
+  return (
+    <div style={{ padding: "10px 0" }}>
+      <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "12px", color: "#FFD700", textShadow: "0 0 12px #FFD700", textAlign: "center", marginBottom: "20px" }}>
+        🏅 ДОСТИЖЕНИЯ
+      </div>
+      <div style={{ fontFamily: "'VT323',monospace", fontSize: "14px", color: "#444", textAlign: "center", marginBottom: "16px" }}>
+        {unlocked.length}/{ACHIEVEMENTS.length} ОТКРЫТО
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {ACHIEVEMENTS.map(ach => {
+          const done = unlocked.includes(ach.id);
+          const isSecret = ach.secret && !done;
+          return (
+            <div key={ach.id} style={{
+              display: "flex", alignItems: "center", gap: "12px",
+              background: done ? "#0a1500" : "#0a0a0a",
+              border: `2px solid ${done ? "#FFD700" : "#1a1a1a"}`,
+              padding: "10px 14px",
+              opacity: done ? 1 : 0.5,
+              transition: "all 0.2s",
+              boxShadow: done ? "0 0 8px #FFD70030" : "none",
+            }}>
+              <span style={{ fontSize: "24px", filter: done ? "none" : "grayscale(1)" }}>
+                {isSecret ? "❓" : ach.icon}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "7px", color: done ? "#FFD700" : "#333" }}>
+                  {isSecret ? "???????????" : ach.title}
+                </div>
+                <div style={{ fontFamily: "'VT323',monospace", fontSize: "13px", color: done ? "#888" : "#2a2a2a", marginTop: "3px" }}>
+                  {isSecret ? "Секретное достижение" : ach.desc}
+                </div>
+              </div>
+              {done && <span style={{ color: "#00ff41", fontSize: "16px" }}>✓</span>}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "20px" }}>
+        <button onClick={onBack} style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "9px", background: "transparent", color: "#00ff41", border: "2px solid #00ff41", padding: "12px 20px", cursor: "pointer" }}>⌂ МЕНЮ</button>
+      </div>
     </div>
   );
 };
@@ -761,9 +876,12 @@ export default function Index() {
   const [speedBonus, setSpeedBonus] = useState(0);
   const timeLeftRef = useRef(60);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [toastAch, setToastAch] = useState<Achievement | null>(null);
   const [highScore, setHighScore] = useState(() => {
     try { return Math.max(0, ...loadScores().map(s => s.score)); } catch { return 0; }
   });
+  // трекинг для достижений за сессию
+  const sessionRef = useRef({ mistakes: 0, totalSpeedBonus: 0, minTimeOnLevel: 999 });
 
   const currentLevel = LEVELS[Math.min(level, LEVELS.length - 1)];
 
@@ -773,8 +891,14 @@ export default function Index() {
 
   const addScore = useCallback((n: number) => setScore(s => s + n), []);
 
+  const tryUnlock = useCallback((id: string) => {
+    const ach = ACHIEVEMENTS.find(a => a.id === id);
+    if (ach && unlockAchievement(id)) setToastAch(ach);
+  }, []);
+
   const handleLose = useCallback(() => {
     stopTimer();
+    sessionRef.current.mistakes += 1;
     setLives(l => {
       const next = l - 1;
       if (next <= 0) { sfx.stopBg(); sfx.playGameOver(); setScreen("lose"); }
@@ -790,19 +914,36 @@ export default function Index() {
     const remaining = timeLeftRef.current;
     const sb = Math.floor(remaining * (levelCfg.scoreReward / levelCfg.timeLimit));
     setSpeedBonus(sb);
+    sessionRef.current.totalSpeedBonus += sb;
+    if (remaining > levelCfg.timeLimit - 5) sessionRef.current.minTimeOnLevel = Math.min(sessionRef.current.minTimeOnLevel, levelCfg.timeLimit - remaining);
+
+    // достижение: спидран (уровень пройден за первые 5 секунд)
+    if (levelCfg.timeLimit - remaining <= 5) tryUnlock("speedrun");
+    // достижение: на полпути
+    if (level + 1 >= 5) tryUnlock("level5");
+
     setScore(s => {
       const next = s + bonus + sb;
       setFinalScore(next);
       if (next > highScore) setHighScore(next);
+      // достижение: 10 000 очков
+      if (next >= 10000) tryUnlock("score10k");
       return next;
     });
+
     if (level >= LEVELS.length - 1) {
+      // финал — проверяем итоговые достижения
+      tryUnlock("first_win");
+      if (sessionRef.current.mistakes === 0) tryUnlock("no_mistakes");
+      if (sessionRef.current.totalSpeedBonus >= 500) tryUnlock("speed_demon");
+      setLives(l => { if (l === 1) { tryUnlock("comeback"); } return l; });
+      if (sessionRef.current.mistakes === 0 && sessionRef.current.totalSpeedBonus >= 500) tryUnlock("perfectionist");
       sfx.stopBg(); sfx.playVictory();
       setTimeout(() => setScreen("enterName"), 400);
     } else {
       setScreen("levelComplete");
     }
-  }, [level, highScore, stopTimer]);
+  }, [level, highScore, stopTimer, tryUnlock]);
 
   // Запуск таймера при каждом новом пазле
   useEffect(() => {
@@ -836,6 +977,7 @@ export default function Index() {
 
   const startGame = () => {
     setLevel(0); setLives(3); setScore(0); setFinalScore(0);
+    sessionRef.current = { mistakes: 0, totalSpeedBonus: 0, minTimeOnLevel: 999 };
     setPuzzleKey(k => k + 1); setScreen("playing");
     sfx.stopBg(); setTimeout(() => sfx.playBg(), 100);
   };
@@ -884,7 +1026,8 @@ export default function Index() {
           background:"#080808", border:"3px solid #00ff4130",
           padding:"24px", boxShadow:"0 0 30px #00ff4110,inset 0 0 30px #00000080",
         }}>
-          {screen === "menu" && <MenuScreen onStart={startGame} onLeaderboard={()=>setScreen("leaderboard")} highScore={highScore} muted={muted} onToggleMute={toggleMute} />}
+          {screen === "menu" && <MenuScreen onStart={startGame} onLeaderboard={()=>setScreen("leaderboard")} onAchievements={()=>setScreen("achievements")} highScore={highScore} muted={muted} onToggleMute={toggleMute} />}
+          {screen === "achievements" && <AchievementsScreen onBack={()=>setScreen("menu")} />}
           {screen === "playing" && renderPuzzle()}
           {screen === "levelComplete" && <LevelCompleteScreen level={level+1} score={score} speedBonus={speedBonus} onNext={nextLevel} />}
           {screen === "enterName" && <EnterNameScreen score={finalScore} onSubmit={handleNameSubmit} />}
@@ -894,12 +1037,15 @@ export default function Index() {
         </div>
       </div>
 
+      {toastAch && <AchievementToast achievement={toastAch} onDone={() => setToastAch(null)} />}
+
       <style>{`
         @keyframes glow { from{text-shadow:0 0 10px #00ff41,0 0 20px #00ff4180} to{text-shadow:0 0 20px #00ff41,0 0 50px #00ff41,0 0 70px #00ff4180} }
         @keyframes bounce { from{transform:translateY(0)} to{transform:translateY(-8px)} }
         @keyframes sway { from{transform:translateX(-2px)} to{transform:translateX(2px)} }
         @keyframes shake { from{transform:translateX(-5px)} to{transform:translateX(5px)} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes slideInRight { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing:border-box; }
         button:hover { opacity:0.85; }
