@@ -508,10 +508,10 @@ export default function Index() {
   const currentLevel = LEVELS[Math.min(level, LEVELS.length - 1)];
 
   const renderPuzzle = () => {
-    const props = { key: puzzleKey, onWin: handleWin, onLose: handleLose, addScore };
-    if (currentLevel.type === "maze") return <MazePuzzle {...props} />;
-    if (currentLevel.type === "pattern") return <PatternPuzzleComp {...props} />;
-    return <SequencePuzzleComp {...props} />;
+    const props = { onWin: handleWin, onLose: handleLose, addScore };
+    if (currentLevel.type === "maze") return <MazePuzzle key={puzzleKey} {...props} />;
+    if (currentLevel.type === "pattern") return <PatternPuzzleComp key={puzzleKey} {...props} />;
+    return <SequencePuzzleComp key={puzzleKey} {...props} />;
   };
 
   return (
