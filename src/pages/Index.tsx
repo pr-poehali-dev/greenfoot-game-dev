@@ -749,6 +749,42 @@ const MenuScreen = ({ onStart, onLeaderboard, onAchievements, highScore, muted, 
   );
 };
 
+// ─── КОНФЕТТИ ────────────────────────────────────────────────────────────────
+const CONFETTI_COLORS = ["#00ff41","#FFD700","#ff0033","#00bfff","#ff69b4","#fff"];
+const CONFETTI_COUNT = 80;
+
+const Confetti = () => {
+  const pieces = Array.from({ length: CONFETTI_COUNT }, (_, i) => {
+    const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    const left = Math.random() * 100;
+    const delay = Math.random() * 1.2;
+    const duration = 2.2 + Math.random() * 1.6;
+    const size = 6 + Math.random() * 8;
+    const rotate = Math.random() * 360;
+    const shape = Math.random() > 0.5 ? "50%" : "0%";
+    return { color, left, delay, duration, size, rotate, shape, id: i };
+  });
+
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 500, overflow: "hidden" }}>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position: "absolute",
+          left: `${p.left}%`,
+          top: "-20px",
+          width: `${p.size}px`,
+          height: `${p.size}px`,
+          background: p.color,
+          borderRadius: p.shape,
+          transform: `rotate(${p.rotate}deg)`,
+          animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+          boxShadow: `0 0 4px ${p.color}80`,
+        }} />
+      ))}
+    </div>
+  );
+};
+
 // ─── ТОСТ ДОСТИЖЕНИЯ ─────────────────────────────────────────────────────────
 const AchievementToast = ({ achievement, onDone }: { achievement: Achievement; onDone: () => void }) => {
   useEffect(() => {
@@ -876,6 +912,7 @@ export default function Index() {
   const timeLeftRef = useRef(60);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [toastAch, setToastAch] = useState<Achievement | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [highScore, setHighScore] = useState(() => {
     try { return Math.max(0, ...loadScores().map(s => s.score)); } catch { return 0; }
   });
@@ -938,6 +975,8 @@ export default function Index() {
       setLives(l => { if (l === 1) { tryUnlock("comeback"); } return l; });
       if (sessionRef.current.mistakes === 0 && sessionRef.current.totalSpeedBonus >= 500) tryUnlock("perfectionist");
       sfx.stopBg(); sfx.playVictory();
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 5000);
       setTimeout(() => setScreen("enterName"), 400);
     } else {
       setScreen("levelComplete");
@@ -1036,6 +1075,7 @@ export default function Index() {
         </div>
       </div>
 
+      {showConfetti && <Confetti />}
       {toastAch && <AchievementToast achievement={toastAch} onDone={() => setToastAch(null)} />}
 
       <style>{`
@@ -1045,6 +1085,7 @@ export default function Index() {
         @keyframes shake { from{transform:translateX(-5px)} to{transform:translateX(5px)} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes slideInRight { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes confettiFall { 0%{transform:translateY(0) rotate(0deg);opacity:1} 80%{opacity:1} 100%{transform:translateY(105vh) rotate(720deg);opacity:0} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing:border-box; }
         button:hover { opacity:0.85; }
