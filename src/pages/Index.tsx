@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 // ─── ТИПЫ ───────────────────────────────────────────────────────────────────
 type GameScreen = "menu" | "playing" | "win" | "lose" | "levelComplete" | "leaderboard" | "enterName";
-type PuzzleType = "maze" | "pattern" | "sequence";
+type PuzzleType = "maze" | "pattern" | "sequence" | "logic";
 
 interface Cell {
   wall: boolean;
@@ -39,11 +39,16 @@ interface ScoreEntry {
 
 // ─── УРОВНИ ─────────────────────────────────────────────────────────────────
 const LEVELS: LevelConfig[] = [
-  { type: "maze", title: "ЛАБИРИНТ ТЕНЕЙ", scoreReward: 100, timeLimit: 60 },
-  { type: "pattern", title: "КОД МАТРИЦЫ", scoreReward: 200, timeLimit: 40 },
-  { type: "sequence", title: "ЧИСЛОВАЯ ЦЕПЬ", scoreReward: 150, timeLimit: 30 },
-  { type: "maze", title: "ТЁМНЫЙ ЛАБИРИНТ", scoreReward: 250, timeLimit: 45 },
-  { type: "pattern", title: "ФИНАЛЬНЫЙ КОД", scoreReward: 500, timeLimit: 25 },
+  { type: "maze",     title: "ЛАБИРИНТ ТЕНЕЙ",   scoreReward: 100,  timeLimit: 60 },
+  { type: "pattern",  title: "КОД МАТРИЦЫ",       scoreReward: 200,  timeLimit: 40 },
+  { type: "sequence", title: "ЧИСЛОВАЯ ЦЕПЬ",     scoreReward: 150,  timeLimit: 30 },
+  { type: "maze",     title: "ТЁМНЫЙ ЛАБИРИНТ",   scoreReward: 250,  timeLimit: 45 },
+  { type: "pattern",  title: "ФИНАЛЬНЫЙ КОД",     scoreReward: 500,  timeLimit: 25 },
+  { type: "logic",    title: "ЗЕРКАЛО РАЗУМА",    scoreReward: 300,  timeLimit: 35 },
+  { type: "sequence", title: "ФИБОНАЧЧИ",         scoreReward: 350,  timeLimit: 25 },
+  { type: "maze",     title: "ЛОВУШКА ХАОСА",     scoreReward: 400,  timeLimit: 35 },
+  { type: "logic",    title: "БАШНЯ ЛОГИКИ",      scoreReward: 450,  timeLimit: 30 },
+  { type: "pattern",  title: "АПОКАЛИПСИС",       scoreReward: 1000, timeLimit: 20 },
 ];
 
 // ─── 8-BIT ЗВУКОВОЙ ДВИЖОК ───────────────────────────────────────────────────
@@ -176,6 +181,9 @@ function generatePatternPuzzle(): PatternPuzzle {
     { grid: [[1,0,1],[0,1,0],[1,0,1]], solution: [0,2,4,6,8], description: "Нажми клетки по диагоналям (крест-накрест)" },
     { grid: [[0,1,0],[1,1,1],[0,1,0]], solution: [1,3,4,5,7], description: "Нажми клетки в форме креста" },
     { grid: [[1,1,1],[1,0,1],[1,1,1]], solution: [0,1,2,3,5,6,7,8], description: "Нажми все клетки по периметру" },
+    { grid: [[1,0,0],[0,1,0],[0,0,1]], solution: [0,4,8], description: "Нажми главную диагональ" },
+    { grid: [[0,0,1],[0,1,0],[1,0,0]], solution: [2,4,6], description: "Нажми побочную диагональ" },
+    { grid: [[1,1,1],[0,0,0],[1,1,1]], solution: [0,1,2,6,7,8], description: "Нажми верхнюю и нижнюю строки" },
   ];
   return patterns[Math.floor(Math.random() * patterns.length)];
 }
@@ -187,10 +195,36 @@ function generateSequencePuzzle(): SequencePuzzle {
     { items: [5,10,20,40], answer: 80, description: "Удвоение. Что дальше?" },
     { items: [3,6,9,12], answer: 15, description: "Таблица умножения на 3. Что дальше?" },
     { items: [1,4,9,16], answer: 25, description: "Квадраты чисел: 1², 2², 3², 4²... Что дальше?" },
+    { items: [1,1,2,3,5], answer: 8, description: "Последовательность Фибоначчи. Что дальше?" },
+    { items: [100,50,25,12], answer: 6, description: "Делим пополам (округляем). Что дальше?" },
+    { items: [7,14,21,28], answer: 35, description: "Таблица умножения на 7. Что дальше?" },
+    { items: [2,3,5,7,11], answer: 13, description: "Простые числа. Что дальше?" },
+    { items: [1,2,4,7,11], answer: 16, description: "Прибавляем 1, 2, 3, 4... Что дальше?" },
   ];
   const chosen = sequences[Math.floor(Math.random() * sequences.length)];
   const wrongOptions = [chosen.answer+5, chosen.answer-3, chosen.answer*2].filter(n => n !== chosen.answer);
   return { ...chosen, options: [...wrongOptions.slice(0,3), chosen.answer].sort(() => Math.random()-0.5) };
+}
+
+interface LogicPuzzle {
+  question: string;
+  options: string[];
+  answer: number;
+  hint: string;
+}
+
+function generateLogicPuzzle(): LogicPuzzle {
+  const puzzles: LogicPuzzle[] = [
+    { question: "У Ивана 3 сестры. У каждой сестры есть 1 брат. Сколько детей в семье?", options: ["3","4","6","7"], answer: 1, hint: "У всех сестёр один общий брат — сам Иван" },
+    { question: "Что тяжелее: 1 кг железа или 1 кг пуха?", options: ["Железо","Пух","Одинаково","Зависит от объёма"], answer: 2, hint: "Масса одинакова — 1 кг" },
+    { question: "Петух снёс яйцо на крыше. В какую сторону оно упадёт?", options: ["На север","На юг","Никуда","Вниз"], answer: 2, hint: "Петухи не несут яиц!" },
+    { question: "Если в комнате 4 угла, в каждом углу сидит кот, напротив каждого кота — 3 кота. Сколько котов?", options: ["12","16","4","8"], answer: 2, hint: "4 кота, каждый видит 3 других" },
+    { question: "Врач дал 3 таблетки: принимать каждые полчаса. Через сколько минут примешь все?", options: ["90","60","45","30"], answer: 1, hint: "1я сейчас, 2я через 30 мин, 3я через 60 мин" },
+    { question: "У отца 5 сыновей: Понедельник, Вторник, Среда, Четверг. Как зовут пятого?", options: ["Пятница","Воскресенье","Пятый","Читай вопрос"], answer: 3, hint: "В вопросе написано 'пятого' — это имя!" },
+    { question: "Сколько месяцев в году имеют 28 дней?", options: ["1","2","6","12"], answer: 3, hint: "У всех месяцев есть хотя бы 28 дней" },
+    { question: "Электричка летит на юг. Ветер дует на запад. В какую сторону дым?", options: ["На запад","На юг","На восток","Дыма нет"], answer: 3, hint: "Электрички не дымят!" },
+  ];
+  return puzzles[Math.floor(Math.random() * puzzles.length)];
 }
 
 // ─── ПИКСЕЛЬНЫЙ ПЕРСОНАЖ ─────────────────────────────────────────────────────
@@ -233,7 +267,7 @@ const HUD = ({ score, lives, level, levelTitle, muted, onToggleMute, timeLeft, t
           <div style={{ color: "#FFD700", fontSize: "13px" }}>{String(score).padStart(6, "0")}</div>
         </div>
         <div style={{ textAlign: "center" }}>
-          <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>УРОВЕНЬ {level}/5</div>
+          <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>УРОВЕНЬ {level}/10</div>
           <div style={{ color: "#00ff41", fontSize: "6px" }}>{levelTitle}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -470,6 +504,76 @@ const SequencePuzzleComp = ({ onWin, onLose, addScore }: { onWin:()=>void; onLos
   );
 };
 
+// ─── ЛОГИЧЕСКАЯ ЗАДАЧА ───────────────────────────────────────────────────────
+const LogicPuzzleComp = ({ onWin, onLose, addScore }: { onWin:()=>void; onLose:()=>void; addScore:(n:number)=>void }) => {
+  const [puzzle] = useState(generateLogicPuzzle);
+  const [charState, setCharState] = useState<"idle"|"walk"|"win"|"dead">("idle");
+  const [message, setMessage] = useState("Подумай хорошенько! 🧠");
+  const [selected, setSelected] = useState<number|null>(null);
+  const [showHint, setShowHint] = useState(false);
+
+  const choose = (idx: number) => {
+    setSelected(idx);
+    if (idx === puzzle.answer) {
+      setCharState("win"); setMessage("🎉 ВЕРНО! Блестящая логика!");
+      sfx.playCorrect(); addScore(90); setTimeout(onWin, 900);
+    } else {
+      setCharState("dead"); setMessage("❌ Неверно! Думай нестандартно...");
+      sfx.playWrong(); setTimeout(onLose, 1100);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"center", marginBottom:"12px" }}><PixelChar state={charState} /></div>
+      <div style={{ fontFamily:"'VT323',monospace", color:"#FFD700", fontSize:"18px", marginBottom:"20px", textAlign:"center", lineHeight:"1.5" }}>{message}</div>
+
+      <div style={{
+        fontFamily:"'VT323',monospace", color:"#00ff41", fontSize:"20px",
+        background:"#050f05", border:"2px solid #00ff4140", padding:"16px",
+        marginBottom:"20px", textAlign:"center", lineHeight:"1.6",
+        boxShadow:"inset 0 0 20px #00ff4108",
+      }}>
+        {puzzle.question}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:"8px", marginBottom:"16px" }}>
+        {puzzle.options.map((opt, i) => (
+          <button key={i} onClick={()=>choose(i)} disabled={selected!==null} style={{
+            fontFamily:"'VT323',monospace", fontSize:"18px", textAlign:"left",
+            background: selected===i ? (i===puzzle.answer?"#003300":"#330000") : "#0a0a0a",
+            color: selected===i ? (i===puzzle.answer?"#00ff41":"#ff0033") : "#aaa",
+            border:`2px solid ${selected===i?(i===puzzle.answer?"#00ff41":"#ff0033"):"#1a1a1a"}`,
+            padding:"10px 16px", cursor: selected!==null?"default":"pointer",
+            transition:"all 0.2s",
+            boxShadow: selected===i&&i===puzzle.answer?"0 0 12px #00ff4160":"none",
+          }}>
+            <span style={{ color:"#555", marginRight:"10px" }}>{["A","B","C","D"][i]}.</span>
+            {opt}
+            {selected===i && i===puzzle.answer && <span style={{ float:"right" }}>✓</span>}
+            {selected===i && i!==puzzle.answer && <span style={{ float:"right" }}>✗</span>}
+          </button>
+        ))}
+      </div>
+
+      {!selected && (
+        <div style={{ display:"flex", justifyContent:"center" }}>
+          <button onClick={()=>setShowHint(h=>!h)} style={{
+            fontFamily:"'Press Start 2P',monospace", fontSize:"8px",
+            background:"transparent", color:"#FFD700", border:"2px solid #FFD700",
+            padding:"10px 16px", cursor:"pointer",
+          }}>💡 ПОДСКАЗКА (-20 ОЧК)</button>
+        </div>
+      )}
+      {showHint && (
+        <div style={{ fontFamily:"'VT323',monospace", color:"#FFD700", fontSize:"16px", textAlign:"center", marginTop:"12px", padding:"10px", border:"1px solid #FFD70030", background:"#0a0800" }}>
+          {puzzle.hint}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── ЭКРАН ВВОДА ИМЕНИ ────────────────────────────────────────────────────────
 const EnterNameScreen = ({ score, onSubmit }: { score: number; onSubmit: (name: string) => void }) => {
   const [name, setName] = useState("");
@@ -577,7 +681,7 @@ const MenuScreen = ({ onStart, onLeaderboard, highScore, muted, onToggleMute }: 
       <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"26px", color:"#FFD700", textShadow:"0 0 16px #FFD700", marginBottom:"28px" }}>QUEST</div>
       <div style={{ marginBottom:"20px", fontSize:"2.5rem" }}><PixelChar state="idle" /></div>
       <div style={{ fontFamily:"'VT323',monospace", color:"#888", fontSize:"16px", marginBottom:"28px", lineHeight:"1.7" }}>
-        5 УРОВНЕЙ • ЛАБИРИНТЫ • ПАТТЕРНЫ • ПОСЛЕДОВАТЕЛЬНОСТИ<br />
+        10 УРОВНЕЙ • ЛАБИРИНТЫ • ПАТТЕРНЫ • ЛОГИКА<br />
         3 ЖИЗНИ • СИСТЕМА ОЧКОВ • ТАБЛИЦА РЕКОРДОВ
       </div>
       {highScore > 0 && (
@@ -729,6 +833,7 @@ export default function Index() {
     const props = { onWin: handleWin, onLose: handleLose, addScore };
     if (currentLevel.type === "maze") return <MazePuzzle key={puzzleKey} {...props} />;
     if (currentLevel.type === "pattern") return <PatternPuzzleComp key={puzzleKey} {...props} />;
+    if (currentLevel.type === "logic") return <LogicPuzzleComp key={puzzleKey} {...props} />;
     return <SequencePuzzleComp key={puzzleKey} {...props} />;
   };
 
