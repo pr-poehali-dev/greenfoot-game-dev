@@ -28,6 +28,7 @@ interface LevelConfig {
   type: PuzzleType;
   title: string;
   scoreReward: number;
+  timeLimit: number;
 }
 
 interface ScoreEntry {
@@ -38,11 +39,11 @@ interface ScoreEntry {
 
 // ─── УРОВНИ ─────────────────────────────────────────────────────────────────
 const LEVELS: LevelConfig[] = [
-  { type: "maze", title: "ЛАБИРИНТ ТЕНЕЙ", scoreReward: 100 },
-  { type: "pattern", title: "КОД МАТРИЦЫ", scoreReward: 200 },
-  { type: "sequence", title: "ЧИСЛОВАЯ ЦЕПЬ", scoreReward: 150 },
-  { type: "maze", title: "ТЁМНЫЙ ЛАБИРИНТ", scoreReward: 250 },
-  { type: "pattern", title: "ФИНАЛЬНЫЙ КОД", scoreReward: 500 },
+  { type: "maze", title: "ЛАБИРИНТ ТЕНЕЙ", scoreReward: 100, timeLimit: 60 },
+  { type: "pattern", title: "КОД МАТРИЦЫ", scoreReward: 200, timeLimit: 40 },
+  { type: "sequence", title: "ЧИСЛОВАЯ ЦЕПЬ", scoreReward: 150, timeLimit: 30 },
+  { type: "maze", title: "ТЁМНЫЙ ЛАБИРИНТ", scoreReward: 250, timeLimit: 45 },
+  { type: "pattern", title: "ФИНАЛЬНЫЙ КОД", scoreReward: 500, timeLimit: 25 },
 ];
 
 // ─── 8-BIT ЗВУКОВОЙ ДВИЖОК ───────────────────────────────────────────────────
@@ -98,6 +99,8 @@ class SoundEngine {
     [440, 220, 110].forEach((f, i) => this.beep(f, 0.1, "sawtooth", 0.18, i * 0.08));
   }
   playClick() { this.beep(440, 0.04, "square", 0.07); }
+  playTick() { this.beep(880, 0.03, "square", 0.05); }
+  playUrgent() { this.beep(660, 0.06, "square", 0.12); }
 
   playBg() {
     if (this.muted) return;
@@ -210,41 +213,69 @@ const PixelChar = ({ state }: { state: "idle"|"walk"|"win"|"dead" }) => {
 };
 
 // ─── HUD ──────────────────────────────────────────────────────────────────────
-const HUD = ({ score, lives, level, levelTitle, muted, onToggleMute }: {
-  score: number; lives: number; level: number; levelTitle: string; muted: boolean; onToggleMute: () => void;
-}) => (
-  <div style={{
-    fontFamily: "'Press Start 2P', monospace", fontSize: "10px", color: "#00ff41",
-    background: "#0a0a0a", border: "3px solid #00ff41", padding: "10px 14px",
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    marginBottom: "12px", boxShadow: "0 0 12px #00ff4140",
-  }}>
-    <div>
-      <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>ОЧКИ</div>
-      <div style={{ color: "#FFD700", fontSize: "13px" }}>{String(score).padStart(6, "0")}</div>
-    </div>
-    <div style={{ textAlign: "center" }}>
-      <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>УРОВЕНЬ {level}/5</div>
-      <div style={{ color: "#00ff41", fontSize: "6px" }}>{levelTitle}</div>
-    </div>
-    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-      <div style={{ textAlign: "right" }}>
-        <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>ЖИЗНИ</div>
-        <div style={{ fontSize: "15px", letterSpacing: "2px" }}>
-          {Array.from({ length: 3 }, (_, i) => (
-            <span key={i} style={{ opacity: i < lives ? 1 : 0.2, transition: "opacity 0.4s" }}>❤️</span>
-          ))}
+const HUD = ({ score, lives, level, levelTitle, muted, onToggleMute, timeLeft, timeLimit }: {
+  score: number; lives: number; level: number; levelTitle: string;
+  muted: boolean; onToggleMute: () => void; timeLeft: number; timeLimit: number;
+}) => {
+  const pct = timeLeft / timeLimit;
+  const urgent = timeLeft <= 10;
+  const timerColor = timeLeft <= 5 ? "#ff0033" : timeLeft <= 10 ? "#ff6600" : "#00ff41";
+  return (
+    <div style={{
+      fontFamily: "'Press Start 2P', monospace", fontSize: "10px", color: "#00ff41",
+      background: "#0a0a0a", border: "3px solid #00ff41", padding: "10px 14px",
+      display: "flex", flexDirection: "column", gap: "8px",
+      marginBottom: "12px", boxShadow: "0 0 12px #00ff4140",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>ОЧКИ</div>
+          <div style={{ color: "#FFD700", fontSize: "13px" }}>{String(score).padStart(6, "0")}</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>УРОВЕНЬ {level}/5</div>
+          <div style={{ color: "#00ff41", fontSize: "6px" }}>{levelTitle}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ color: "#666", fontSize: "6px", marginBottom: "3px" }}>ЖИЗНИ</div>
+            <div style={{ fontSize: "15px", letterSpacing: "2px" }}>
+              {Array.from({ length: 3 }, (_, i) => (
+                <span key={i} style={{ opacity: i < lives ? 1 : 0.2, transition: "opacity 0.4s" }}>❤️</span>
+              ))}
+            </div>
+          </div>
+          <button onClick={onToggleMute} title="Звук" style={{
+            background: "transparent", border: "2px solid #00ff4160", color: "#00ff41",
+            width: "30px", height: "30px", cursor: "pointer", fontSize: "14px",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{muted ? "🔇" : "🔊"}</button>
         </div>
       </div>
-      <button onClick={onToggleMute} title="Звук" style={{
-        background: "transparent", border: "2px solid #00ff4160", color: "#00ff41",
-        width: "30px", height: "30px", cursor: "pointer", fontSize: "14px",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
-      }}>{muted ? "🔇" : "🔊"}</button>
+      {/* Таймер */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{
+          fontFamily: "'Press Start 2P', monospace", fontSize: "11px",
+          color: timerColor, minWidth: "36px", textAlign: "right",
+          animation: urgent ? "pulse 0.5s infinite" : "none",
+          textShadow: urgent ? `0 0 8px ${timerColor}` : "none",
+        }}>
+          {String(timeLeft).padStart(2, "0")}s
+        </div>
+        <div style={{ flex: 1, height: "8px", background: "#0a0a0a", border: `1px solid ${timerColor}40`, position: "relative", overflow: "hidden" }}>
+          <div style={{
+            position: "absolute", left: 0, top: 0, bottom: 0,
+            width: `${pct * 100}%`,
+            background: timerColor,
+            boxShadow: `0 0 6px ${timerColor}`,
+            transition: "width 1s linear, background 0.3s",
+          }} />
+        </div>
+        <div style={{ color: "#333", fontSize: "6px", minWidth: "20px" }}>⏱</div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── ЛАБИРИНТ ────────────────────────────────────────────────────────────────
 const MazePuzzle = ({ onWin, onLose, addScore }: { onWin:()=>void; onLose:()=>void; addScore:(n:number)=>void }) => {
@@ -614,13 +645,32 @@ export default function Index() {
   const [puzzleKey, setPuzzleKey] = useState(0);
   const [muted, setMuted] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [highScore, setHighScore] = useState(() => {
     try { return Math.max(0, ...loadScores().map(s => s.score)); } catch { return 0; }
   });
 
+  const currentLevel = LEVELS[Math.min(level, LEVELS.length - 1)];
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  }, []);
+
   const addScore = useCallback((n: number) => setScore(s => s + n), []);
 
+  const handleLose = useCallback(() => {
+    stopTimer();
+    setLives(l => {
+      const next = l - 1;
+      if (next <= 0) { sfx.stopBg(); sfx.playGameOver(); setScreen("lose"); }
+      else { setPuzzleKey(k => k + 1); }
+      return next;
+    });
+  }, [stopTimer]);
+
   const handleWin = useCallback(() => {
+    stopTimer();
     const bonus = LEVELS[level].scoreReward;
     setScore(s => {
       const next = s + bonus;
@@ -629,22 +679,34 @@ export default function Index() {
       return next;
     });
     if (level >= LEVELS.length - 1) {
-      sfx.stopBg();
-      sfx.playVictory();
+      sfx.stopBg(); sfx.playVictory();
       setTimeout(() => setScreen("enterName"), 400);
     } else {
       setScreen("levelComplete");
     }
-  }, [level, highScore]);
+  }, [level, highScore, stopTimer]);
 
-  const handleLose = useCallback(() => {
-    setLives(l => {
-      const next = l - 1;
-      if (next <= 0) { sfx.stopBg(); sfx.playGameOver(); setScreen("lose"); }
-      else setPuzzleKey(k => k + 1);
-      return next;
-    });
-  }, []);
+  // Запуск таймера при каждом новом пазле
+  useEffect(() => {
+    if (screen !== "playing") { stopTimer(); return; }
+    const limit = currentLevel.timeLimit;
+    setTimeLeft(limit);
+    stopTimer();
+    let t = limit;
+    timerRef.current = setInterval(() => {
+      t -= 1;
+      setTimeLeft(t);
+      if (t <= 10 && t > 0) sfx.playTick();
+      if (t <= 5 && t > 0) sfx.playUrgent();
+      if (t <= 0) {
+        stopTimer();
+        sfx.playWrong();
+        handleLose();
+      }
+    }, 1000);
+    return stopTimer;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, puzzleKey, level]);
 
   const handleNameSubmit = (name: string) => {
     saveScore({ name, score: finalScore, date: new Date().toLocaleDateString("ru-RU") });
@@ -659,11 +721,9 @@ export default function Index() {
   };
 
   const nextLevel = () => { setLevel(l => l + 1); setPuzzleKey(k => k + 1); setScreen("playing"); };
-  const restart = () => { sfx.stopBg(); setLevel(0); setLives(3); setScore(0); setPuzzleKey(k => k + 1); setScreen("menu"); };
+  const restart = () => { stopTimer(); sfx.stopBg(); setLevel(0); setLives(3); setScore(0); setPuzzleKey(k => k + 1); setScreen("menu"); };
   const retryLevel = () => { setLives(3); setScore(0); setLevel(0); setPuzzleKey(k => k + 1); setScreen("playing"); sfx.playBg(); };
   const toggleMute = () => { const m = sfx.toggleMute(); setMuted(m); };
-
-  const currentLevel = LEVELS[Math.min(level, LEVELS.length - 1)];
 
   const renderPuzzle = () => {
     const props = { onWin: handleWin, onLose: handleLose, addScore };
@@ -693,7 +753,10 @@ export default function Index() {
         )}
 
         {screen === "playing" && (
-          <HUD score={score} lives={lives} level={level+1} levelTitle={currentLevel.title} muted={muted} onToggleMute={toggleMute} />
+          <HUD score={score} lives={lives} level={level+1} levelTitle={currentLevel.title}
+            muted={muted} onToggleMute={toggleMute}
+            timeLeft={timeLeft} timeLimit={currentLevel.timeLimit}
+          />
         )}
 
         <div style={{
