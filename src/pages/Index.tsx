@@ -725,13 +725,21 @@ const LoseScreen = ({ onRestart, onRetry }: { onRestart:()=>void; onRetry:()=>vo
   </div>
 );
 
-const LevelCompleteScreen = ({ level, score, onNext }: { level:number; score:number; onNext:()=>void }) => {
+const LevelCompleteScreen = ({ level, score, speedBonus, onNext }: { level:number; score:number; speedBonus:number; onNext:()=>void }) => {
   const [vis, setVis] = useState(false);
   useEffect(() => { setTimeout(()=>setVis(true),80); sfx.playLevelUp(); }, []);
   return (
     <div style={{ textAlign:"center", padding:"20px 0", opacity:vis?1:0, transition:"opacity 0.4s" }}>
       <div style={{ fontSize:"48px", marginBottom:"10px", animation:"bounce 0.4s infinite alternate" }}>⭐</div>
-      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"13px", color:"#00ff41", textShadow:"0 0 12px #00ff41", marginBottom:"8px" }}>УРОВЕНЬ {level} ПРОЙДЕН!</div>
+      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"13px", color:"#00ff41", textShadow:"0 0 12px #00ff41", marginBottom:"12px" }}>УРОВЕНЬ {level} ПРОЙДЕН!</div>
+      {speedBonus > 0 && (
+        <div style={{ animation:"fadeIn 0.4s 0.3s both" }}>
+          <div style={{ fontFamily:"'VT323',monospace", color:"#aaa", fontSize:"15px", marginBottom:"4px" }}>БОНУС ЗА СКОРОСТЬ</div>
+          <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"14px", color:"#FFD700", textShadow:"0 0 10px #FFD700", marginBottom:"8px", animation:"glow 1s infinite alternate" }}>
+            +{speedBonus} ⚡
+          </div>
+        </div>
+      )}
       <div style={{ fontFamily:"'VT323',monospace", color:"#FFD700", fontSize:"20px", marginBottom:"24px" }}>ОЧКИ: {String(score).padStart(6,"0")}</div>
       <button onClick={()=>{sfx.playClick();onNext();}} style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"10px", background:"#00ff41", color:"#000", border:"none", padding:"14px 24px", cursor:"pointer", boxShadow:"0 0 14px #00ff41", animation:"pulse 1s infinite" }}>
         СЛЕДУЮЩИЙ УРОВЕНЬ ▶
@@ -750,6 +758,8 @@ export default function Index() {
   const [muted, setMuted] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(60);
+  const [speedBonus, setSpeedBonus] = useState(0);
+  const timeLeftRef = useRef(60);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [highScore, setHighScore] = useState(() => {
     try { return Math.max(0, ...loadScores().map(s => s.score)); } catch { return 0; }
@@ -775,9 +785,13 @@ export default function Index() {
 
   const handleWin = useCallback(() => {
     stopTimer();
-    const bonus = LEVELS[level].scoreReward;
+    const levelCfg = LEVELS[level];
+    const bonus = levelCfg.scoreReward;
+    const remaining = timeLeftRef.current;
+    const sb = Math.floor(remaining * (levelCfg.scoreReward / levelCfg.timeLimit));
+    setSpeedBonus(sb);
     setScore(s => {
-      const next = s + bonus;
+      const next = s + bonus + sb;
       setFinalScore(next);
       if (next > highScore) setHighScore(next);
       return next;
@@ -795,11 +809,13 @@ export default function Index() {
     if (screen !== "playing") { stopTimer(); return; }
     const limit = currentLevel.timeLimit;
     setTimeLeft(limit);
+    timeLeftRef.current = limit;
     stopTimer();
     let t = limit;
     timerRef.current = setInterval(() => {
       t -= 1;
       setTimeLeft(t);
+      timeLeftRef.current = t;
       if (t <= 10 && t > 0) sfx.playTick();
       if (t <= 5 && t > 0) sfx.playUrgent();
       if (t <= 0) {
@@ -870,7 +886,7 @@ export default function Index() {
         }}>
           {screen === "menu" && <MenuScreen onStart={startGame} onLeaderboard={()=>setScreen("leaderboard")} highScore={highScore} muted={muted} onToggleMute={toggleMute} />}
           {screen === "playing" && renderPuzzle()}
-          {screen === "levelComplete" && <LevelCompleteScreen level={level+1} score={score} onNext={nextLevel} />}
+          {screen === "levelComplete" && <LevelCompleteScreen level={level+1} score={score} speedBonus={speedBonus} onNext={nextLevel} />}
           {screen === "enterName" && <EnterNameScreen score={finalScore} onSubmit={handleNameSubmit} />}
           {screen === "win" && <LeaderboardScreen onBack={restart} />}
           {screen === "leaderboard" && <LeaderboardScreen onBack={()=>setScreen("menu")} />}
