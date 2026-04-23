@@ -710,7 +710,7 @@ const MenuScreen = ({ onStart, onLeaderboard, onAchievements, highScore, muted, 
 
   return (
     <div style={{ textAlign:"center", padding:"20px 0" }}>
-      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"26px", color:"#00ff41", textShadow:"0 0 20px #00ff41", marginBottom:"6px", animation:"glow 2s infinite alternate" }}>PIXEL</div>
+      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"26px", color:"#00ff41", textShadow:"0 0 20px #00ff41", marginBottom:"6px", animation:"glow 2s infinite alternate" }}>VVGU</div>
       <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"26px", color:"#FFD700", textShadow:"0 0 16px #FFD700", marginBottom:"28px" }}>QUEST</div>
       <div style={{ marginBottom:"20px", fontSize:"2.5rem" }}><PixelChar state="idle" /></div>
       <div style={{ fontFamily:"'VT323',monospace", color:"#888", fontSize:"16px", marginBottom:"28px", lineHeight:"1.7" }}>
@@ -1010,7 +1010,7 @@ export default function Index() {
       <div style={{ width:"100%", maxWidth:"520px", position:"relative", zIndex:1 }}>
         {screen !== "menu" && screen !== "leaderboard" && (
           <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"7px", color:"#00ff4150", textAlign:"center", marginBottom:"8px", letterSpacing:"4px" }}>
-            ▓▓ PIXEL QUEST ▓▓
+            ▓▓ VVGU QUEST ▓▓
           </div>
         )}
 
