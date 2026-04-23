@@ -749,6 +749,58 @@ const MenuScreen = ({ onStart, onLeaderboard, onAchievements, highScore, muted, 
   );
 };
 
+// ─── ЧАСТИЦЫ ПРИ ПРАВИЛЬНОМ ОТВЕТЕ ───────────────────────────────────────────
+interface Particle { id: number; x: number; y: number; color: string; angle: number; speed: number; }
+
+const ParticleBurst = ({ x, y, onDone }: { x: number; y: number; onDone: () => void }) => {
+  const colors = ["#00ff41","#FFD700","#fff","#00bfff","#ff69b4"];
+  const particles = Array.from({ length: 16 }, (_, i) => ({
+    id: i, color: colors[i % colors.length],
+    angle: (360 / 16) * i, speed: 40 + Math.random() * 60,
+  }));
+  useEffect(() => { const t = setTimeout(onDone, 700); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div style={{ position: "fixed", left: x, top: y, pointerEvents: "none", zIndex: 600 }}>
+      {particles.map(p => {
+        const rad = (p.angle * Math.PI) / 180;
+        return (
+          <div key={p.id} style={{
+            position: "absolute", width: "6px", height: "6px",
+            background: p.color, borderRadius: "50%",
+            animation: `particleFly 0.6s ease-out forwards`,
+            "--tx": `${Math.cos(rad) * p.speed}px`,
+            "--ty": `${Math.sin(rad) * p.speed}px`,
+            boxShadow: `0 0 4px ${p.color}`,
+          } as React.CSSProperties} />
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── КОМБО ТОСТ ──────────────────────────────────────────────────────────────
+const ComboToast = ({ combo }: { combo: number }) => {
+  if (combo < 2) return null;
+  const colors = ["","","#00ff41","#FFD700","#ff6600","#ff0033","#ff00ff"];
+  const color = colors[Math.min(combo, colors.length - 1)];
+  const labels = ["","","ДВОЙНОЙ!","ТРОЙНОЙ!","КВАДРО!","ПЕНТА!","ЛЕГЕНДА!"];
+  const label = labels[Math.min(combo, labels.length - 1)];
+  return (
+    <div style={{
+      position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+      pointerEvents: "none", zIndex: 700, textAlign: "center",
+      animation: "comboAppear 0.6s ease-out forwards",
+    }}>
+      <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "28px", color, textShadow: `0 0 20px ${color}, 0 0 40px ${color}` }}>
+        x{combo}
+      </div>
+      <div style={{ fontFamily: "'Press Start 2P',monospace", fontSize: "10px", color, marginTop: "6px" }}>
+        {label}
+      </div>
+    </div>
+  );
+};
+
 // ─── КОНФЕТТИ ────────────────────────────────────────────────────────────────
 const CONFETTI_COLORS = ["#00ff41","#FFD700","#ff0033","#00bfff","#ff69b4","#fff"];
 const CONFETTI_COUNT = 80;
@@ -913,6 +965,11 @@ export default function Index() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [toastAch, setToastAch] = useState<Achievement | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [combo, setCombo] = useState(0);
+  const [showCombo, setShowCombo] = useState(false);
+  const [flashError, setFlashError] = useState(false);
+  const [burst, setBurst] = useState<{ x: number; y: number; id: number } | null>(null);
+  const comboTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [highScore, setHighScore] = useState(() => {
     try { return Math.max(0, ...loadScores().map(s => s.score)); } catch { return 0; }
   });
@@ -927,6 +984,26 @@ export default function Index() {
 
   const addScore = useCallback((n: number) => setScore(s => s + n), []);
 
+  const triggerCombo = useCallback(() => {
+    setCombo(c => {
+      const next = c + 1;
+      if (next >= 2) {
+        setShowCombo(true);
+        if (comboTimeoutRef.current) clearTimeout(comboTimeoutRef.current);
+        comboTimeoutRef.current = setTimeout(() => setShowCombo(false), 1200);
+      }
+      return next;
+    });
+    // частицы в центре экрана
+    setBurst({ x: window.innerWidth / 2, y: window.innerHeight / 2, id: Date.now() });
+  }, []);
+
+  const triggerError = useCallback(() => {
+    setCombo(0);
+    setFlashError(true);
+    setTimeout(() => setFlashError(false), 400);
+  }, []);
+
   const tryUnlock = useCallback((id: string) => {
     const ach = ACHIEVEMENTS.find(a => a.id === id);
     if (ach && unlockAchievement(id)) setToastAch(ach);
@@ -935,18 +1012,22 @@ export default function Index() {
   const handleLose = useCallback(() => {
     stopTimer();
     sessionRef.current.mistakes += 1;
+    triggerError();
     setLives(l => {
       const next = l - 1;
       if (next <= 0) { sfx.stopBg(); sfx.playGameOver(); setScreen("lose"); }
       else { setPuzzleKey(k => k + 1); }
       return next;
     });
-  }, [stopTimer]);
+  }, [stopTimer, triggerError]);
 
   const handleWin = useCallback(() => {
     stopTimer();
+    triggerCombo();
     const levelCfg = LEVELS[level];
-    const bonus = levelCfg.scoreReward;
+    const comboNow = combo + 1;
+    const comboMult = comboNow >= 2 ? 1 + (comboNow - 1) * 0.5 : 1;
+    const bonus = Math.floor(levelCfg.scoreReward * comboMult);
     const remaining = timeLeftRef.current;
     const sb = Math.floor(remaining * (levelCfg.scoreReward / levelCfg.timeLimit));
     setSpeedBonus(sb);
@@ -981,7 +1062,7 @@ export default function Index() {
     } else {
       setScreen("levelComplete");
     }
-  }, [level, highScore, stopTimer, tryUnlock]);
+  }, [level, highScore, stopTimer, tryUnlock, triggerCombo, combo]);
 
   // Запуск таймера при каждом новом пазле
   useEffect(() => {
@@ -1014,7 +1095,7 @@ export default function Index() {
   };
 
   const startGame = () => {
-    setLevel(0); setLives(3); setScore(0); setFinalScore(0);
+    setLevel(0); setLives(3); setScore(0); setFinalScore(0); setCombo(0);
     sessionRef.current = { mistakes: 0, totalSpeedBonus: 0, minTimeOnLevel: 999 };
     setPuzzleKey(k => k + 1); setScreen("playing");
     sfx.stopBg(); setTimeout(() => sfx.playBg(), 100);
@@ -1033,13 +1114,25 @@ export default function Index() {
     return <SequencePuzzleComp key={puzzleKey} {...props} />;
   };
 
+  const bgGlow = screen === "playing"
+    ? timeLeft <= 5  ? "radial-gradient(ellipse at 50% 50%,#2a000060 0%,transparent 70%)"
+    : timeLeft <= 10 ? "radial-gradient(ellipse at 50% 50%,#1a0a0050 0%,transparent 70%)"
+    : combo >= 3     ? "radial-gradient(ellipse at 50% 50%,#001a2a50 0%,transparent 70%)"
+    : "radial-gradient(ellipse at 20% 20%,#001a0030 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#1a000030 0%,transparent 50%)"
+    : "radial-gradient(ellipse at 20% 20%,#001a0030 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#1a000030 0%,transparent 50%)";
+
   return (
     <div style={{
       minHeight:"100vh", background:"#050505",
-      backgroundImage:"radial-gradient(ellipse at 20% 20%,#001a0030 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#1a000030 0%,transparent 50%)",
+      backgroundImage: bgGlow,
       display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-start",
       padding:"24px 16px",
+      transition:"background-image 0.5s",
     }}>
+      {/* Флэш ошибки */}
+      {flashError && (
+        <div style={{ position:"fixed", inset:0, background:"#ff003330", zIndex:800, pointerEvents:"none", animation:"flashIn 0.4s ease-out forwards" }} />
+      )}
       <div style={{
         position:"fixed", top:0, left:0, right:0, bottom:0,
         backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.12) 2px,rgba(0,0,0,0.12) 4px)",
@@ -1054,10 +1147,23 @@ export default function Index() {
         )}
 
         {screen === "playing" && (
-          <HUD score={score} lives={lives} level={level+1} levelTitle={currentLevel.title}
-            muted={muted} onToggleMute={toggleMute}
-            timeLeft={timeLeft} timeLimit={currentLevel.timeLimit}
-          />
+          <>
+            <HUD score={score} lives={lives} level={level+1} levelTitle={currentLevel.title}
+              muted={muted} onToggleMute={toggleMute}
+              timeLeft={timeLeft} timeLimit={currentLevel.timeLimit}
+            />
+            {combo >= 2 && (
+              <div style={{
+                fontFamily:"'Press Start 2P',monospace", fontSize:"8px", textAlign:"center",
+                marginBottom:"6px",
+                color: combo >= 5 ? "#ff00ff" : combo >= 4 ? "#ff0033" : combo >= 3 ? "#ff6600" : "#FFD700",
+                textShadow: `0 0 10px currentColor`,
+                animation:"pulse 0.5s infinite",
+              }}>
+                🔥 КОМБО x{combo} {combo >= 3 ? "—" : ""} {combo >= 5 ? "ЛЕГЕНДА" : combo >= 4 ? "ПЕНТА" : combo >= 3 ? "ТРОЙНОЙ" : ""}
+              </div>
+            )}
+          </>
         )}
 
         <div style={{
@@ -1076,6 +1182,8 @@ export default function Index() {
       </div>
 
       {showConfetti && <Confetti />}
+      {showCombo && <ComboToast combo={combo} />}
+      {burst && <ParticleBurst key={burst.id} x={burst.x} y={burst.y} onDone={() => setBurst(null)} />}
       {toastAch && <AchievementToast achievement={toastAch} onDone={() => setToastAch(null)} />}
 
       <style>{`
@@ -1086,6 +1194,9 @@ export default function Index() {
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes slideInRight { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
         @keyframes confettiFall { 0%{transform:translateY(0) rotate(0deg);opacity:1} 80%{opacity:1} 100%{transform:translateY(105vh) rotate(720deg);opacity:0} }
+        @keyframes particleFly { 0%{transform:translate(0,0);opacity:1} 100%{transform:translate(var(--tx),var(--ty));opacity:0} }
+        @keyframes comboAppear { 0%{transform:translate(-50%,-50%) scale(0.5);opacity:0} 40%{transform:translate(-50%,-50%) scale(1.3);opacity:1} 70%{transform:translate(-50%,-50%) scale(1);opacity:1} 100%{transform:translate(-50%,-50%) scale(1.1);opacity:0} }
+        @keyframes flashIn { 0%{opacity:1} 100%{opacity:0} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing:border-box; }
         button:hover { opacity:0.85; }
