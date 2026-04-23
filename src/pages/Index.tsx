@@ -714,8 +714,7 @@ const MenuScreen = ({ onStart, onLeaderboard, onAchievements, highScore, muted, 
       <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"26px", color:"#FFD700", textShadow:"0 0 16px #FFD700", marginBottom:"28px" }}>QUEST</div>
       <div style={{ marginBottom:"20px", fontSize:"2.5rem" }}><PixelChar state="idle" /></div>
       <div style={{ fontFamily:"'VT323',monospace", color:"#888", fontSize:"16px", marginBottom:"28px", lineHeight:"1.7" }}>
-        10 УРОВНЕЙ • ЛАБИРИНТЫ • ПАТТЕРНЫ • ЛОГИКА<br />
-        3 ЖИЗНИ • СИСТЕМА ОЧКОВ • ТАБЛИЦА РЕКОРДОВ
+        ИГРА, КОТОРАЯ ЗАСТАВИТ ТЕБЯ ДУМАТЬ!
       </div>
       {highScore > 0 && (
         <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"8px", color:"#FFD700", marginBottom:"20px" }}>
